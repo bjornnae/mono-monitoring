@@ -1,0 +1,166 @@
+module mono.mostack;
+import java.util.UUID;
+import java.io.File;
+load yeti.json;
+load yeti.lang.io;
+
+/* A persistent stack with key value db functionality. 
+ * It will reside in memory and will be eventually persisted.
+ * This will be nothing but a naieve implementation suitable for little data which will not scale very good. 
+ * If bigger data/performance needs arise, use something better.
+ * 
+ * ##metadata on stack messages
+ * tag   - one tag which can be used to grouped several messages on the stack. 
+ * id   - one id which is the only one residing in the stack. 
+ *         If a new message is pushed with a id that already exist in the stack, the previous message will be evicted. 
+ * ttl   - time to live: can be either null, none, zero, meaning forever or an integer meaning milliseconds before eviction
+ * _time - A timestamp which is assigned to the message when it is introduced into the stack. 
+ *         The system assigns the timestamp, user don't need to.
+ */
+
+typedef qobj = { id is string, tag is string, var _time is number, ttl is number, var data is string};
+
+toJSONStr qob is qobj -> string = "{\"_time\": \(qob._time), \"id\": \"\(qob.id)\", \"tag\": \"\(qob.tag)\",\"ttl\": \(qob.ttl),\"data\": \"\(qob.data)\"}";
+
+fromJSONObj jsobj is json -> qobj = {
+    id =  jsobj |> jsGet 'id' |> string,
+    tag = jsobj |> jsGet 'tag' |> string,
+    var _time = jsobj |> jsGet '_time' |> string |> number,
+    ttl = jsobj |> jsGet 'ttl' |> string |> number,
+    var data = jsobj |> jsGet 'data' |> string
+    };
+
+db_serialize filePath qobjs is string -> array<qobj> ->  () = 
+    writeFile filePath "" (`putLines` (map toJSONStr qobjs));
+    
+db_deserialize filePath is string -> array<qobj> = (
+    lines = readFile filePath '' getLines;
+    array (map (fromJSONObj . jsonParse) lines)
+    );
+
+db_getModificationTime filePath is string -> number = ( 
+    f = new java.io.File(filePath);
+    f#lastModified()
+    );
+    
+/* Generate a pseudo random UUID.  */
+genUUID _ = UUID#randomUUID()#toString();
+    
+getTimeStampNow _ = System#currentTimeMillis();
+    
+touchTime stack = array ( map (do qo: if qo.id == "_STACK" then (qo._time := getTimeStampNow(); qo) else qo fi done) stack );   
+    
+{
+/*     spush   
+ *     Push messages to a stack:
+ *     stack = spush stack {ttl = 1000, id = "1339291", tag = "tracker-1", data="This is some data"};
+ *     stack = spush stack {ttl = 1000, id = "1339292", tag = "tracker-1", data = "{name:\"This is a serialized JSON object\"}"};    
+ */   
+    spush stack data is array<qobj> -> qobj -> array<qobj> = ( 
+        push stack data;
+        stack = touchTime stack;
+        ssync stack
+    ),
+    
+/* Make a QObject which is compatible with all mostack operations.  */
+    makeQobj id tag ttl data is string -> string -> number -> string -> qobj = 
+        if id == "" then {id = genUUID(), tag = tag, var _time = (getTimeStampNow ()), ttl = ttl, var data = data}
+        else {id = id, tag = tag, var _time = (getTimeStampNow ()), ttl = ttl, var data = data}
+        fi,
+
+/* Delete member in stack by id.  */
+    sdel stack id = 
+        stack = array ( filter (do qo: if qo.id != id then true else false fi done) stack);
+        stack = touchTime stack;
+        ssync stack,
+        
+/*  Synchronize in memory and persisted data structure.
+ *   
+ *  Persist the stuff. Ideally this shall be done asynchronously when changes to the stack occurs.  
+ *  Algorithm is: check timestamp of last write to disk and last update to internal structure. 
+ *  either read from disk or write to disk based on this.
+ */
+    ssync stack is array<qobj> -> array<qobj> = 
+        dbFilePath = (sget stack "_STACK").data;
+        stackTS = (sget stack "_STACK")._time;
+        fileTS = db_getModificationTime  (dbFilePath);
+        if stackTS > fileTS 
+        then (println "DEBUG:ssync:SyncCase1: InMemory more recent, writing stack to disk."; 
+            db_serialize dbFilePath stack)
+        else (println "DEBUG:ssync:SyncCase2: Disk more recent, reading stack from disk."; 
+            stack = db_deserialize dbFilePath; 
+            () )
+        fi;
+        stack,
+    
+    sget stack id = head ( filter do qo: qo.id == id done stack ),
+
+    sgetByTag stack tag = filter do qo: qo.tag == tag done stack,
+
+/* supdate stack id updateFn 
+ * 
+ * Updates a record in the stack by running provided updateFn on record.
+ * triggers sync with file.
+ * 
+ */
+    supdate stack id updateFn is array<qobj> -> string -> (qobj -> qobj) -> array<qobj> = (
+        stack = ssync stack;
+        stack = array (map (do qo: 
+                                if qo.id == id then ( updateFn qo )
+                                elif qo.id == "_STACK" then ( qo._time := getTimeStampNow(); qo )
+                                else qo 
+                                fi 
+                            done) 
+                    stack);
+        ssync stack;
+        ),
+        
+/* setModtime - to be used as updateFn in supdate.  */
+    setModtime newtime qob is number -> qobj -> qobj = 
+        qob._time := newtime; 
+        qob,
+
+/* setData - to be used as updateFn in supdate.  */
+    setData newdata qob is string -> qobj -> qobj = 
+        qob._time := getTimeStampNow(); 
+        qob.data := newdata; 
+        qob,
+    
+/* sset - push a new message on the stack. 
+ * If an older message with the same key as the new message already exist in the stack, 
+ * the older message will first be removed.
+ */
+    sset stack qob is array<qobj> -> qobj -> array<qobj> = (
+        var ss = stack;
+        ids = map ( do x: x.id done ) ss;
+        if (qob.id in (hash ids)) then ( ss := sdel ss qob.id ) fi;
+        spush ss qob
+        ),
+    
+/*  Find evictable messages on the stack which have out-aged their TTL.   */
+    evictable stack is array<qobj> -> array<qobj> = 
+        nowtime = getTimeStampNow();
+        array (filter (do qo:  if  (qo.ttl == 0) then false 
+                        elif qo._time + qo.ttl < nowtime then true
+                        else false
+                        fi 
+                        done) stack),
+               
+/* TBD: Evict older messages.  */
+    //~ evict stack = 
+        //~ sdelLst stack ( evictable stack ),
+    
+    
+/* initDB - Initiate a new stack or read an existing from disk. */
+    initDB dbpath is string -> array<qobj> = 
+            try
+                db_deserialize dbpath as array<qobj>;
+            catch java.io.FileNotFoundException ex:
+                spush ( array [] ) (makeQobj "_STACK" "" 0 "\(dbpath)");
+            yrt,
+
+/* spprint - Pretty printing a stack.     */
+   spprint sstack = fold (do a l : a ^ "\n\(toJSONStr l)"; done) "" sstack;
+    
+    
+    }

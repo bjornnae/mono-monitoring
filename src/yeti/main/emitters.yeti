@@ -1,0 +1,14 @@
+module mono.emitters;
+ms = load mono.mostack;
+utils = load mono.utils;
+
+rssStr channel msg = "AR{\\\"channel\\\" : \\\"\(channel)\\\", \\\"message\\\" : \\\"\(msg)\\\"}";
+
+log logFilePath msg = 
+    utils.spit ( ( utils.slurp logFilePath ) ^ "\n\(msg)");
+
+
+//Rollup e...
+//~ rollup name firstTime dTime =  if dtime do msg : 
+    //~ if 
+    

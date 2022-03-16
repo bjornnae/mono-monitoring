@@ -1,0 +1,10 @@
+{"host":"localhost","service":"ESB-test-suite","state":"ok","time":1.64398157E9,"description":"test log message","tags":["test"],"metric":[{"name":"processingTime_mS","value":3.2}],"ttl":0}
+{"host":"localhost","service":"ESB-test-suite","state":"ok","time":1.64398158E9,"description":"test log message","tags":["test"],"metric":[{"name":"processingTime_mS","value":3.2}],"ttl":0}
+{"host":"localhost","service":"ESB-test-suite","state":"ok","time":1.64398159E9,"description":"test log message","tags":["test"],"metric":[{"name":"processingTime_mS","value":3.2}],"ttl":0}
+{"time": 1645426744758, "host": "bndlaptop", "service": "testservice","state": "ok", "description": "allOK", "tags": ["test"], "metric" : [{"name": "elapsedTimeMS", "value" : 12}], "ttl" : 10 }
+{"time": 1645426745796, "host": "bndlaptop", "service": "testservice","state": "ok", "description": "allOK", "tags": ["test"], "metric" : [{"name": "elapsedTimeMS", "value" : 12}], "ttl" : 10 }
+{"time": 1645426748910, "host": "bndlaptop", "service": "testservice","state": "ok", "description": "allOK", "tags": ["test"], "metric" : [{"name": "elapsedTimeMS", "value" : 12}], "ttl" : 10 }
+{"time": 1645426751325, "host": "bndlaptop", "service": "testservice","state": "ok", "description": "allOK", "tags": ["test"], "metric" : [{"name": "elapsedTimeMS", "value" : 12}], "ttl" : 10 }
+{"time": 1645426754557, "host": "bndlaptop", "service": "testservice","state": "ok", "description": "allOK", "tags": ["test"], "metric" : [{"name": "elapsedTimeMS", "value" : 12}], "ttl" : 10 }
+{"time": 1645426757232, "host": "bndlaptop", "service": "testservice","state": "ok", "description": "allOK", "tags": ["test"], "metric" : [{"name": "elapsedTimeMS", "value" : 12}], "ttl" : 10 }
+{"time": 1645426759678, "host": "bndlaptop", "service": "testservice","state": "ok", "description": "allOK", "tags": ["test"], "metric" : [{"name": "elapsedTimeMS", "value" : 12}], "ttl" : 10 }

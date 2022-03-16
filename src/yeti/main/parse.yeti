@@ -1,0 +1,99 @@
+module mono.parse;
+/*
+Module responsible for parsing a log of state messages into stateLogObjects and serialize into a JSON representation.
+
+getLogLines 
+
+types:
+  stateLogObject
+
+*/
+
+load yeti.json;
+load yeti.lang.io;
+
+typedef stateLogObjType = {
+   description is string,
+   host is string,
+   metric is list<hash<string, string>>,
+   service is string,
+   state is string,
+   tags is list<string>,
+   time is number,
+   ttl is number
+}
+
+{ 
+    maybeJsNum j = 
+        case j of Number j: j;
+                Null(): 0;
+                _: 0
+        esac,
+        
+    maybeJsStr j = 
+        case j of String j: j;
+                Null(): "";
+                _: ""
+        esac,
+            
+    maybeJsList j = 
+        case j of List j: j;
+                Null(): [];
+                _: []
+        esac,
+        
+    maybeJsObj j = 
+        case j of Object j: j;
+                Null(): [:];
+                _: [:]
+        esac,
+        
+    
+    jsListOfObjToListOfHash jsObj = 
+        jsObj  |> jsList |> map do k: ["name" : (jsGet 'name' k |> string), "value": (jsGet 'value') k |> string] done,
+    
+    jsLogTostateLogObject j is json -> stateLogObjType =  
+        { host = j |> jsGet 'host' |> string,
+        service = j |> jsGet 'service' |> string,
+        state = j |> jsGet 'state' |> string,
+        time = j |> jsGet 'time' |> string |> number,
+        description = j |> jsGet 'description' |> jsValue |> maybeJsStr,
+        tags = j |> jsGet 'tags' |> jsValue |> maybeJsList |> map string,
+        metric = j |> jsGet 'metric' |> jsListOfObjToListOfHash,
+        ttl = j |> jsGet 'ttl' |> jsValue |> maybeJsNum ,
+        },
+			
+	// Turn a JSON string into an event.
+    // jsStrToEvent jsStrTostateLogObject
+	jsStrTostateLogObject jsStr is string -> stateLogObjType = jsLogTostateLogObject (jsonParse jsStr),
+		
+	getLogLines filename is string -> list<string> = readFile filename '' getLines,
+	
+	parseLogLines lstOfLoglines is list<string> -> list<stateLogObjType> =
+		map jsStrTostateLogObject lstOfLoglines,
+	
+	// Turn an event object such as returned from jsLogTostateLogObject, into its JSON-representation.
+	stateLogObjectToJSON stateLogObject is stateLogObjType -> json = (
+		//println "<DEBUG:stateLogObjectToJSON stateLogObjectToJSON > start: \(stateLogObject)";
+		intermediateObj = [
+		"time" : jsOfNum stateLogObject.time, 
+		"host" : jsOfStr stateLogObject.host,
+		"service" : jsOfStr stateLogObject.service,
+		"state" : jsOfStr stateLogObject.state,
+		"description" : jsOfStr stateLogObject.description,
+        // todo: This cripples metric to only output one record. Fixit.
+		"metric" : if defined? stateLogObject.metric then 
+            jsOfList [ jsOfObj ["name" : jsOfStr (at (head stateLogObject.metric) "name"), "value" : jsOfStr (at (head stateLogObject.metric) "value") ]] 
+            else jsNull 
+            fi,
+		"tags" : jsOfList (map jsOfStr stateLogObject.tags),
+		"ttl" : jsOfNum stateLogObject.ttl
+		];
+		jsOfObj intermediateObj
+	),
+
+	makeEv time host service state description metric tags ttl is number -> string  -> string  -> string -> string -> list<hash<string,string>>  -> list<string>  -> number -> stateLogObjType = 
+        {time = time, host = host, service = service, state = state, description = description, metric = metric, tags = tags,  ttl = ttl},
+		
+}
+	

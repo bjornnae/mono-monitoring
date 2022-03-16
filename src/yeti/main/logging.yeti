@@ -1,0 +1,46 @@
+module mono.logging;
+mu = load mono.utils;
+load yeti.lang.io;
+
+{
+    var logLevel = 0,
+    
+    getLogLevel _ = logLevel,
+    
+    setLogLevel level = logLevel := level,
+    
+    var logfileName = (mu.getProperties "mono.properties")["mono.logfile"],
+    
+    getLogfileName _ = logfileName,
+    
+    setLogfileName fileName = logfileName := fileName,
+    
+    logFileExist? _ = (
+        f = listDirectory false './';
+        if contains? (getLogfileName ()) ( map (do d: d.name done) f ) then true
+        else false
+        fi),
+        
+    timestamp _ = new java.util.Date(System#currentTimeMillis()),
+    
+    logWithLevel levelNum levelText component astr is  number -> string -> string -> string -> () = 
+        if  levelNum >= getLogLevel () then (
+            newLogLine = "<\(timestamp ())><\(component)><\(levelText)>\(astr)";
+            var content = "";
+            if logFileExist? () then content := mu.slurp ( getLogfileName () ) ^ newLogLine
+            else content := newLogLine
+            fi;
+            mu.spit ( getLogfileName () ) content 
+            )
+        else ()
+        fi,
+        
+    logDebug component astr = logWithLevel  1 "Debug" component astr,
+    
+    logInfo component astr = logWithLevel 2 "Info" component astr,
+    
+    logWarn component astr = logWithLevel 3 "Warning" component astr,
+    
+    logError component astr = logWithLevel 4 "Error" component astr
+}    
+    

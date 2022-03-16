@@ -1,0 +1,16 @@
+program testlogging;
+log = load mono.logging;
+mu = load mono.utils;
+
+for [
+(log.setLogLevel 5;
+mu.testAssert "Assert get set logLevel" (log.getLogLevel () == 5) (do _: true done) (do _ : new Exception ("Test fail."); false done)),
+(log.setLogLevel 0;
+log.logDebug "testlogging" "This is a debug message.";
+log.logInfo "testlogging" "This is a Info message.";
+log.logWarn "testlogging" "This is a Warn message.";
+log.logError "testlogging" "This is a Error message."; 
+true)
+] println;
+
+

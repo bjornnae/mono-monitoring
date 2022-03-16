@@ -1,0 +1,43 @@
+module testmonoparse;
+mp = load mono.parse;
+
+{
+    test1 _ =  (
+    time1 = System#currentTimeMillis();
+    var counter = 0;
+    stepParse lst = (if lst != []  
+            then (
+                counter := counter + 1;
+                println "LINE> \(mp.jsStrTostateLogObject (head lst) )";
+                stepParse (tail lst));
+            else 
+                println "Done Parsing.";
+        fi);
+    stepParse (mp.getLogLines "./../../resources/ev2.log");
+    println "Parsed entire log of \(counter) lines in \(System#currentTimeMillis() - time1) msek."
+    ),		
+    
+    //makeEv time host service state description metric tags ttl
+    evObj1 = mp.makeEv 100000 "localhost" "service.1" "ok" "A description" [["name" : "mname", "value" : "32"]] ["a", "b"] 100,
+    
+    logline1 = '{"time" : 100000, "host" : "localhost", "service" : "service.1", "state" : "ok", "description" : "A description", "metric" : [{"name" : "mname", "value" : "32"}], "tags" : ["a", "b"], "ttl" : 100 }',
+    
+    test2 _ = (
+        evObj2 = mp.jsStrTostateLogObject logline1;
+        println "evObj1: \(evObj1)";
+        println "evObj2: \(evObj2)";
+    ),
+    
+    test3 _ = (
+        pSafe = mp.jsLogTostateLogObject;
+        astr1 = '{"host":"VW00-T4120","service":"file transfer from vw00-t4105 to ftp","state":"ok","time":1.64541658E9,"description":"file transfered: _SKB_ResourceAssignmentSpread_data.enc","tags":null,"metric":null,"ttl":null}';
+        astr2 = '{"host":"VW00-T4120","service":"file transfer from vw00-t4105 to ftp","state":"ok","time":1.64541658E9,"description":"file transfered: _SKB_ResourceAssignmentSpread_data.enc","tags":["some"],"metric": [{"name" : "aMetric", "value" : "some Value"}],"ttl":100}';
+        astr3 = '{"host":"VW00-T4120","service":"file transfer from vw00-t4105 to ftp","state":"ok","time":1.64541658E9,"description":"file transfered: _SKB_ResourceAssignmentSpread_data.enc","tags":["some"],"metric": [{"name" : "metric1", "value" : "5"},{"name" : "metric2", "value" : "17"}],"ttl":100}';
+        println (pSafe astr1);
+        println (pSafe astr2);
+        println (pSafe astr3);
+    )
+    
+    runTests _ = (test1 (); test2 (); test3 ());
+}
+

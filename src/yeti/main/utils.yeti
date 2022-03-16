@@ -1,0 +1,23 @@
+module mono.utils;
+
+{
+	getProperties propertiesFileName = (
+		p = [:];
+		propertyLines = readFile propertiesFileName '' getLines;
+		for propertyLines do pl:
+			rec = parseProperties(pl);
+			k = head (keys rec);
+			p[k] := rec[k];
+		done;
+		p),
+        
+    slurp fileName = readFile fileName  '' getContents,
+    
+    spit fileName content = writeFile fileName '' (`putLines` [content]),
+    
+    getCurrentTime _ = System#currentTimeMillis(),
+
+    testAssert testname testTrueFalse blockIfTrue blockIfFalse = 
+        if testTrueFalse then (blockIfTrue ()) else (blockIfTrue ()) fi
+    
+}

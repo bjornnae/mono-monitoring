@@ -1,0 +1,55 @@
+module testmostack;
+ms = load mono.mostack;
+
+(
+getTimeStampNow _ = System#currentTimeMillis();
+// Init stack
+var ss = ms.initDB "test.db";
+var s2 = ms.initDB "test2.db";
+
+// Creating elements:
+ss = ms.sset ss ( ms.makeQobj "id1" "tag1" 500     "{\\\"name\\\": \\\"Some data\\\"      }" );
+ss = ms.sset ss ( ms.makeQobj "id2" "tag1" 1000    "{\\\"name\\\": \\\"Some other data\\\"}" );
+ss = ms.sset ss ( ms.makeQobj "id3" "tag2" 1000000 "{\\\"name\\\": \\\"Some data 99\\\"    }" );
+ss = ms.sset ss ( ms.makeQobj "id4" "tag2" 2000    "{\\\"name\\\": \\\"Some data 4\\\"    }" );
+ss = ms.sset ss ( ms.makeQobj "id4" "tag2" 2000    "{\\\"name\\\": \\\"Some data 444\\\"    }" );
+ss = ms.sset ss ( ms.makeQobj ""    "tag2" 2500    "{\\\"name\\\": \\\"Some data 5\\\"    }" );
+
+print "Stack:";
+println ( ms.spprint ss );
+
+// Deleting elements by key:
+ss = ms.sdel ss "id4"; 
+print "Stack: (record with id4 deleted.)";
+println ( ms.spprint ss );
+
+// Watching as elements become evictable:
+var n = 0;
+n < 3 loop (
+    sleep 1;
+    println "\nEvictables at time = \(getTimeStampNow()) -> ";
+    evictables = ms.evictable ss;
+    println ( ms.spprint evictables);
+    n := n + 1;
+);
+
+// Evict too old:
+//ss := ms.evict ss;
+//~ print "Stack (after evicting too old messages):";
+//~ println ( ms.spprint ss );
+
+// Update a message with existing key:
+ss = ms.sset ss ( ms.makeQobj "id3" "tag2" 1500 "{\\\"name\\\": \\\"Some data 3\\\"    }" );
+println "updated-replaced: \(ms.sget ss 'id3')";
+
+// Update an existing message with new data:
+ss = ms.supdate ss "id3" (ms.setData "{\\\"name\\\": \\\"Some data 333\\\"    }");
+println "updated-data: \(ms.sget ss 'id3')";
+
+// Get a list of messages sharing tag:
+tag2msg = ms.sgetByTag ss "tag2";
+println "data: \(ms.spprint tag2msg)";
+
+ms.ssync ss;
+
+)
