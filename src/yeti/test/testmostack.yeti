@@ -1,4 +1,4 @@
-module testmostack;
+program testmostack;
 ms = load mono.mostack;
 
 (

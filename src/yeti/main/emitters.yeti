@@ -1,11 +1,13 @@
 module mono.emitters;
 //ms = load mono.mostack; // Use stack for rollup.
 utils = load mono.utils;
+log = load mono.logging;
 
 {
 rssStr channel msg = "AR{\\\"channel\\\" : \\\"\(channel)\\\", \\\"message\\\" : \\\"\(msg)\\\"}",
 
 toLog logFilePath msg = 
+    log.logDebug "mono.toLog" "Writing to log file \(logFilePath).";
     utils.spit logFilePath ( ( utils.slurp logFilePath ) ^ "\n\(msg)");
 
 

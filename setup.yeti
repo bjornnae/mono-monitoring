@@ -1,0 +1,47 @@
+program mono.setup;
+mo = load mono.mono;
+mu = load mono.utils;
+mp = load mono.parse;
+em = load mono.emitters;
+mr = load mono.run;
+
+/* This is the mono agent configuration point and the program entry point. 
+ * Start this script and the monitoring solution will roll on 
+ * until the process running this script is terminated.
+ *  
+ */
+
+    config  = [
+        // If no other config is found, the config for _base will be used.
+        {id = "_base", defaultTTL = 10, defaultState = "ok"}, 
+        {id = "bndlaptoptestService", defaultTTL = 10, defaultState = "ok"}
+    ];
+    
+    consumers = [
+     		// This consumer generates a heartbeat checkpoint.
+            {name = "detect-heartbeat-1", 	  
+            id = "bndlaptoptestService", 
+            triggerOn = do ev : case  ev of TTLHeartbeatMissed n: true; _: false; esac; done, 
+            actOn = do evRec : ( 
+                    mo.evLogAppend (mp.makeEv (mo.getCurrentTime () / 1000) "monointernal" ".testService.missingHeart" 
+                        "loopAfterTTL" "Search party for missing heartbeat." [
+                        ["name" : "loopcount", "value" : "1"]] [""] 100);
+                    println "<ACTION:\(name)> Missing heart. Activate search party until found again.";)
+                    done;  },
+                    
+			// This consumer produces a message every time the default state (set in config variable above) is deviated from.		
+            {name = "detect-stay-in-state-1", id = "bndlaptoptestService", 
+                triggerOn = do ev: case  ev of DefaultStateLeave n: true; _: false; esac; done, 
+                actOn = do evRec: em.toLog ((mu.getProperties  (mo.getPropertyfile ()))["mono.outpout.rssFile"] ) 
+                                            (em.rssStr "PrimaveraReporting" "Deviation."); done;  },
+                
+			// This consumer produces a message every time the log message goes from a deviating state back to the desireable state.
+            {name = "detect-stay-in-state-2", id = "bndlaptoptestService", 
+                triggerOn = do ev: case  ev of DefaultStateJoin n: true; _: false; esac; done, 
+                actOn = do evRec: println "<ACTION:\(name)> Returning to OK State."; done;  },
+        ];
+
+// Start the monitoring agent.				
+mr.run config consumers;
+
+  

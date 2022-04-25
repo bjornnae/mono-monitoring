@@ -1,4 +1,4 @@
-module testmonoproc;
+program testmonoproc;
 mproc = load mono.proc;
 mp = load mono.parse;
 mo = load mono.mono;

@@ -63,7 +63,7 @@ Index
 	publishEv log event = push log event,
 	
 	// for each message in new events check if index is in baseline and if time is greater than baseline time.
-	detectNewMessages baselineIndex logevents = (
+	detectNewMessages baselineIndex logevents is hash<string, mp.stateLogObjType> -> list?<mp.stateLogObjType> -> list?<mp.stateLogObjType> = (
 		log.logDebug "mono.detectNewMessages" "Now start.";
 		newEvents = array [];
 		var rowCount = 0;
@@ -118,7 +118,12 @@ Index
         done
     ),
     
+	// Missing heartbeat etc...
+	detectNonEvents currentIndex = (),
+		
+	
     doEval config consumers currentIndex stateMessageList is 'b -> 'a -> hash<string, mp.stateLogObjType> -> list?<mp.stateLogObjType> -> () = 
+		// TODO: Also detect missing heartbeats from index.
         case stateMessageList of 
 		[]: ();
 		_:  ( ev = mproc.evalEvents config currentIndex ( head stateMessageList ) ;
@@ -130,8 +135,6 @@ Index
         esac,
         
     checkPrerequisites _ =   
-        // todo: Check if mono.config exists. If not, throw a helpful error msg.
-        // todo: Check if mono.db.indexfile exist. If not, create it and make a baseline from mono.input.eventsfile.
         if (not configurationExists? ()) then throw new java.io.IOException("Configuration file \(( getPropertyfile () )) is missing. Useless to proceed without it.")
         else
             if not dbExists?() then (

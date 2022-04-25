@@ -1,4 +1,5 @@
 module mono.utils;
+import java.time.LocalDateTime;
 
 {
 	getProperties propertiesFileName = (
@@ -16,6 +17,8 @@ module mono.utils;
     spit fileName content = writeFile fileName '' (`putLines` [content]),
     
     getCurrentTime _ = System#currentTimeMillis(),
+
+	getCurrentDateTime _ = LocalDateTime#now(),
 
     testAssert testname testTrueFalse blockIfTrue blockIfFalse = 
         if testTrueFalse then (blockIfTrue ()) else (blockIfTrue ()) fi

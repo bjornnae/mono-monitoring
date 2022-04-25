@@ -45,10 +45,11 @@ typedef eventType = StateChange {current is string, next is string} | StateSame 
         idxConfig = getIdxFromConfig config idx;
         if idx in currentIndex then (
             messageIndex = currentIndex[idx];	
-            {id = idx, t = evMessage.time,  ev = [detectStateChange messageIndex evMessage,
-            detectStateDefault idxConfig.defaultState messageIndex evMessage,
-            detectTTLHeartbeat idxConfig.defaultTTL messageIndex evMessage]}
-            );
-        else {id = idx, t = evMessage.time,  ev = [NewIndex ()]}
+            {id = idx, t = evMessage.time, description = evMessage.description, ev = [
+                detectStateChange messageIndex evMessage,
+                detectStateDefault idxConfig.defaultState messageIndex evMessage,
+                detectTTLHeartbeat idxConfig.defaultTTL messageIndex evMessage]
+            });
+        else {id = idx, t = evMessage.time,  description = evMessage.description, ev = [NewIndex ()]}
         fi,
     }

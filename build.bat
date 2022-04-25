@@ -2,7 +2,7 @@ rem Prepare
 mkdir stage
 mkdir target
 copy src\yeti\main\*.yeti stage
-copy run.yeti stage
+copy setup.yeti stage
 
 rem Compile:
 java -jar lib\yeti.jar -d build stage\*.yeti

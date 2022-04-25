@@ -1,1 +1,1 @@
-java -jar lib\yeti.jar stage\run.yeti 
+java -jar lib\yeti.jar stage\setup.yeti 
