@@ -65,7 +65,12 @@ typedef stateLogObjType = {
 			
 	// Turn a JSON string into an event.
     // jsStrToEvent jsStrTostateLogObject
-	jsStrTostateLogObject jsStr is string -> stateLogObjType = jsLogTostateLogObject (jsonParse jsStr),
+	jsStrTostateLogObject jsStr is string -> stateLogObjType = 
+		try 
+			jsLogTostateLogObject (jsonParse jsStr);
+		catch java.text.ParseException ex:
+			makeEv 0 "localhost" "parse-log-error-trap" "fail" jsStr [] [] 0;
+		yrt,
 		
 	getLogLines filename is string -> list<string> = readFile filename '' getLines,
 	
@@ -81,7 +86,7 @@ typedef stateLogObjType = {
 		"service" : jsOfStr stateLogObject.service,
 		"state" : jsOfStr stateLogObject.state,
 		"description" : jsOfStr stateLogObject.description,
-        // todo: This cripples metric to only output one record. Fixit.
+        //TODO: This cripples metric to only output one record. Fixit.
 		"metric" : if defined? stateLogObject.metric then 
             jsOfList [ jsOfObj ["name" : jsOfStr (at (head stateLogObject.metric) "name"), "value" : jsOfStr (at (head stateLogObject.metric) "value") ]] 
             else jsNull 
