@@ -1,0 +1,31 @@
+program mono.testEventsInSequence;
+emitters = load mono.emitters;
+utils = load mono.utils;
+common = load mono.common;
+
+logFilePath = (common.getProperties "mono.properties")["mono.input.eventsfile"];
+runTimes = 1000;
+var count = 0;
+
+(count < runTimes) loop (
+	println "Loop \(count) of \(runTimes).";
+	count := count + 1;
+	emitters.toLog logFilePath "{\"time\": \(utils.getCurrentTime ();), \"host\": \"bndlaptop\", \"service\": \"testService\",\"state\": \"ok\", \"description\": \"allOK\", \"tags\": [\"generate events test\"], \"metric\" : [{\"name\" : \"count\", \"value\" : \(count)}], \"ttl\" : 10 }";
+	
+	if (randomInt 100 < 10) then ( 
+		println "Bad event.";
+		emitters.toLog logFilePath "{\"time\": \(utils.getCurrentTime ();), \"host\": \"bndlaptop\", \"service\": \"testService\",\"state\": \"fail\", \"description\": \"allBAD\", \"tags\": [\"generate events test\"], \"metric\" : [{\"name\" : \"count\", \"value\" : \(count)}], \"ttl\" : 0.5 }";
+		)
+	fi;
+
+	if (randomInt 100 < 10) then ( 
+		println "Good event.";
+		emitters.toLog logFilePath "{\"time\": \(utils.getCurrentTime ();), \"host\": \"bndlaptop\", \"service\": \"testService\",\"state\": \"ok\", \"description\": \"ok\", \"tags\": [\"generate events test\"], \"metric\" : [{\"name\" : \"count\", \"value\" : \(count)}], \"ttl\" : 0.5 }";
+		)
+	fi;
+	
+	sleep 0.1;
+	);
+	
+	
+	

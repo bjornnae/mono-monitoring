@@ -1,0 +1,47 @@
+program testmonoevents;
+//mproc = load mono.events;
+mp = load mono.parse;
+mo = load mono.monoagent;
+
+
+t1 _ = (
+	var currentIndex = ["bndlaptoptestService" : (mp.makeEv 1.645524100402E9 "bndlaptop" "testService" "ok" "some description" [["name" : "metricName", "value" :"32.1"]] ["a tag"] 100)];
+	logStateLines = array[];
+	push logStateLines '{"metric":[{"name":"metricName","value":"32.1"}],"service":"testService","host":"bndlaptop","description":"All is OK.","time":1.645524101402E9,"state":"ok","ttl":100,"tags":["a tag"]}';
+	push logStateLines '{"metric":[{"name":"metricName","value":"32.1"}],"service":"testService","host":"bndlaptop","description":"All is OK.","time":1.645524102402E9,"state":"ok","ttl":0,"tags":["a tag", "Another tag"]}';
+	push logStateLines '{"metric":[{"name":"metricName","value":"32.1"}],"service":"testService","host":"bndlaptop","description":"All is OK.","time":1.645524103402E9,"state":"ok","ttl":100,"tags":["a tag"]}';
+	push logStateLines '{"metric":[{"name":"metricName","value":"32.1"}],"service":"testService","host":"bndlaptop","description":"All is OK.","time":1.645524104402E9,"state":"ok","ttl":0.5,"tags":["a tag"]}';
+	push logStateLines '{"metric":[{"name":"metricName","value":"32.1"}],"service":"testService","host":"bndlaptop","description":"Cannot do stuff.","time":1.645524105402E9,"state":"error","ttl":100,"tags":["a tag"]}';
+	push logStateLines '{"metric":[{"name":"metricName","value":"32.1"}],"service":"testService","host":"bndlaptop","description":"Cannot do stuff.","time":1.645524105452E9,"state":"error","ttl":100,"tags":["a tag"]}';
+	push logStateLines '{"metric":[{"name":"metricName","value":"32.1"}],"service":"testService","host":"bndlaptop","description":"Cannot do stuff.","time":1.645524106402E9,"state":"error","ttl":100,"tags":["a tag"]}';
+	push logStateLines '{"metric":[{"name":"metricName","value":"32.1"}],"service":"testService","host":"bndlaptop","description":"All is OK.","time":1.645524107402E9,"state":"ok","ttl":100,"tags":["a tag"]}';
+	push logStateLines '{"metric":[{"name":"metricName","value":"32.1"}],"service":"testService","host":"bndlaptop","description":"All is OK.","time":1.645524108402E9,"state":"ok","ttl":100,"tags":["a tag"]}';
+	push logStateLines '{"metric":[{"name":"metricName","value":"32.1"}],"service":"testService","host":"bndlaptop","description":"All is OK.","time":1.645524109402E9,"state":"ok","ttl":100,"tags":["a tag"]}';
+	stateMessageList = mp.parseLogLines (list logStateLines);
+	
+    config = [
+        {id = "_base", defaultTTL = 100, defaultState = "ok"},
+        {id = "bndlaptoptestService", defaultTTL = 10, defaultState = "ok"}
+        ];
+        
+	consumers = [
+		{name = "detect-heartbeat-1", 	  
+		id = "bndlaptoptestService", 
+		triggerOn = do ev : case  ev of TTLHeartbeatMissed n: true; _: false; esac; done, 
+		actOn = do evRec : ( 
+				mo.evLogAppend (mp.makeEv (mo.getCurrentTime () / 1000) "monointernal" ".testService.missingHeart" "loopAfterTTL" "Search party for missing heartbeat." [["name" : "loopcount", "value" : "1"]] [""] 100);
+				println "<ACTION:\(name)> Missing heart. Activate search party until found again.";)
+				done;  },
+		{name = "detect-stay-in-state-1", id = "bndlaptoptestService", triggerOn = do ev: case  ev of DefaultStateLeave n: true; _: false; esac; done, actOn = do evRec: println "<ACTION:\(name)> Leaving OK State."; done;  },
+		{name = "detect-stay-in-state-2", id = "bndlaptoptestService", triggerOn = do ev: case  ev of DefaultStateJoin n: true; _: false; esac; done, actOn = do evRec: println "<ACTION:\(name)> Returning to OK State."; done;  },
+	];
+		
+// Add monitors
+//todo generate counter for {id = "monoTestServiceMissingHeart", triggerOn }
+
+	mo.doEval config consumers currentIndex stateMessageList
+	);
+	
+t1 ();
+	
+

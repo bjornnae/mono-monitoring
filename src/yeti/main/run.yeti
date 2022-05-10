@@ -1,30 +1,57 @@
 module mono.run;
-mo = load mono.mono;
-mu = load mono.utils;
-log = load mono.logging;
+mo = load mono.monoagent;
+common = load mono.common;
+utils = load mono.utils;
 
 /* 
 This is the part of the program which is responsible for looping the change and action process.
-The configuration file mono.properties holds a property named mono.pollwait.seconds. This polling intervall will decide how often the monitoring Agent is run. If you want an agent that quickly discovers new events (but eats system resources) you set this value low (e.g. 0.10). If you have a system where time to detection is less critical, set this value to 10 or 60.
+The configuration file mono.properties holds a property named mono.pollwait.seconds. 
+This polling intervall will decide how often the monitoring Agent is run. 
+If you want an agent that quickly discovers new events (but eats system resources) you set this value low (e.g. 0.10). 
+If you have a system where time to detection is less critical, set this value to 10 or 60.
 */
-log.setLogLevel 0;
-log.logDebug "monorun" "Starting loop forever.";
+utils.setLogLevel 0;
+utils.logDebug "monorun" "Starting loop forever.";
 {
 var i = 0,
-pollWait = (mu.getProperties (mo.getPropertyfile ()))["mono.pollwait.seconds"] |> number,
+pollWait = (common.getProperties (common.getPropertyfile ()))["mono.pollwait.seconds"] |> number,
 
-run config consumers = 	
+run config consumers is list<{
+   defaultState is string,
+   defaultTTL is number,
+   id is string
+  }> -> list<{
+   .actOn is DefaulStateStay ()
+      | DefaultStateJoin ()
+      | DefaultStateLeave ()
+      | DefaultStateOff ()
+      | NewIndex ()
+      | StateChange {current is string, next is string}
+      | StateSame ()
+      | TTLHeartbeatMissed number
+      | TTLHeartbeatOK number -> (),
+   .id is string,
+   .triggerOn is DefaulStateStay ()
+      | DefaultStateJoin ()
+      | DefaultStateLeave ()
+      | DefaultStateOff ()
+      | NewIndex ()
+      | StateChange {current is string, next is string}
+      | StateSame ()
+      | TTLHeartbeatMissed number
+      | TTLHeartbeatOK number -> boolean
+  }> -> () = 	
 	true loop (
 		var loopSuccess = false;
-		log.logDebug "monorun"  "Step \(i)";
+		utils.logDebug "monorun"  "Step \(i)";
 		try (
 			mo.monitorNewStateReportMessages config consumers;
 			loopSuccess := true;)
 		catch java.io.IOException ex:
 			(loopSuccess := false;
-			log.logWarn "monorun"  "IO error happened: \(ex)";)
+			utils.logWarn "monorun"  "IO error happened: \(ex)";)
 		finally
-			if not loopSuccess then log.logError "monorun" "An unhandled exception occured."
+			if not loopSuccess then utils.logError "monorun" "An unhandled exception occured."
 			else ()
 			fi
 		yrt;

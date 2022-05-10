@@ -1,11 +1,9 @@
 program testmostack;
 ms = load mono.mostack;
 
-(
 getTimeStampNow _ = System#currentTimeMillis();
 // Init stack
 var ss = ms.initDB "test.db";
-var s2 = ms.initDB "test2.db";
 
 // Creating elements:
 ss = ms.sset ss ( ms.makeQobj "id1" "tag1" 500     "{\\\"name\\\": \\\"Some data\\\"      }" );
@@ -48,8 +46,8 @@ println "updated-data: \(ms.sget ss 'id3')";
 
 // Get a list of messages sharing tag:
 tag2msg = ms.sgetByTag ss "tag2";
-println "data: \(ms.spprint tag2msg)";
+println "data: \(ms.spprint (array tag2msg))";
 
-ms.ssync ss;
+s = ms.ssync ss;
 
-)
+print s

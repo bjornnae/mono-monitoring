@@ -1,26 +1,111 @@
 module mono.utils;
 import java.time.LocalDateTime;
+common = load mono.common;
+parse = load mono.parse;
+
+typedef indexType = {
+	var time is number,
+	var indexedRowCount is number,
+	var dbindex is hash<string, 'a>
+	};
 
 {
-	getProperties propertiesFileName = (
-		p = [:];
-		propertyLines = readFile propertiesFileName '' getLines;
-		for propertyLines do pl:
-			rec = parseProperties(pl);
-			k = head (keys rec);
-			p[k] := rec[k];
-		done;
-		p),
-        
     slurp fileName = readFile fileName  '' getContents,
     
     spit fileName content = writeFile fileName '' (`putLines` [content]),
     
     getCurrentTime _ = System#currentTimeMillis(),
 
-	getCurrentDateTime _ = LocalDateTime#now(),
+    getCurrentDateTime _ = LocalDateTime#now(),
 
+    indexToJSFile _ = (  
+	dLines = slurp (common.getProperties  (common.getPropertyfile ()))['mono.db.indexfile']; 
+	spit ((common.getProperties  (common.getPropertyfile ()))['mono.output.jsIndex']) 
+            "var monoindex = [\(strReplace ',\n' '\n' dLines) ];")
+    ,
+		
+    // Make index of logLst containing Event objects.
+    makeIndex logLst is list<'a> -> indexType = (
+		var indexedRowCount = 0;
+		dbindex = [:];
+		for logLst do r:
+			indexedRowCount := indexedRowCount + 1;
+			indexKey = r.host ^ r.service;
+			if indexKey in dbindex then (	
+				if (dbindex[indexKey].time > r.time) then 
+                                    logWarn "utils.makeIndex" "WARNING: Message is out of time. Discarding this older message for indexing: \(r)";
+				else dbindex[indexKey] := r
+				fi );
+			else dbindex[indexKey] := r;
+			fi;
+		done;
+		{var time = getCurrentTime (), var indexedRowCount = indexedRowCount, var dbindex = dbindex}
+		),
+		
+    // Save Index state to disk.	
+    persistIndex dbIndexStruct = (
+	dbEncoding = ''; 
+	indexLines = list dbIndexStruct.dbindex;
+        dbIndexFilePath = ((common.getProperties (common.getPropertyfile ()))['mono.db.indexfile']);  
+	writeFile dbIndexFilePath dbEncoding 
+          (`putLines` 
+              (map string 
+                  (map parse.stateLogObjectToJSON indexLines))
+          );
+	// Finally, also write an index that can be used by an external javascript monitoring UI:
+	indexToJSFile ();
+    ),		
+		
+    // TODO: Need to think through design, will need some kind of log file action that can be parsed and reacted upon. 
+    //Untested. 
+    /*removeFromIndex removeId logLst = 
+		idx = makeIndex logLst;
+		ks = keys idx;
+		remainders = filter (_ k = k != removeId) ks;
+		common.persistIndex (map (_ id = idx[id]) remainders),
+*/
+    // TODO: move to own module perhaps mono.testing
     testAssert testname testTrueFalse blockIfTrue blockIfFalse = 
-        if testTrueFalse then (blockIfTrue ()) else (blockIfTrue ()) fi
+        if testTrueFalse then (blockIfTrue ()) else (blockIfTrue ()) fi,
     
+
+    //// Logging. Moved here due to circular dependencies with utils.
+    var logLevel = 0,
+    
+    getLogLevel _ = logLevel,
+    
+    setLogLevel level = logLevel := level,
+    
+    var logfileName = (common.getProperties "mono.properties")["mono.logfile"],
+    
+    getLogfileName _ = logfileName,
+    
+    setLogfileName fileName = logfileName := fileName,
+    
+    logFileExist? _ = (
+        f = listDirectory false './';
+        if contains? (getLogfileName ()) ( map (do d: d.name done) f ) then true
+        else false
+        fi),
+    
+    logWithLevel levelNum levelText component astr is  number -> string -> string -> string -> () = 
+        if  levelNum >= getLogLevel () then (
+            newLogLine = "<\(getCurrentDateTime ())><\(component)><\(levelText)>\(astr)";
+            var content = "";
+            if logFileExist? () then content := slurp ( getLogfileName () ) ^ newLogLine
+            else content := newLogLine
+            fi;
+            spit ( getLogfileName () ) content 
+            )
+        else ()
+        fi,
+        
+    logDebug component astr = logWithLevel  1 "Debug" component astr,
+    
+    logInfo component astr = logWithLevel 2 "Info" component astr,
+    
+    logWarn component astr = logWithLevel 3 "Warning" component astr,
+    
+    logError component astr = logWithLevel 4 "Error" component astr
+
 }

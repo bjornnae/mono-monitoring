@@ -2,6 +2,9 @@ rem Prepare
 mkdir stage
 mkdir target
 copy src\yeti\main\*.yeti stage
+copy src\yeti\test\*.yeti stage
+
+
 copy setup.yeti stage
 
 rem Compile:

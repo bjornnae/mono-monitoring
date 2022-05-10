@@ -1,0 +1,18 @@
+module mono.common;
+/*
+
+        */
+{
+    getPropertyfile _ = "mono.properties",
+
+    getProperties propertiesFileName = (
+        p = [:];
+	propertyLines = readFile propertiesFileName '' getLines;
+	for propertyLines do pl:
+	    rec = parseProperties(pl);
+	    k = head (keys rec);
+	    p[k] := rec[k];
+	done;
+    p),
+        
+}

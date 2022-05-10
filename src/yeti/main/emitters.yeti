@@ -1,15 +1,18 @@
 module mono.emitters;
-//ms = load mono.mostack; // Use stack for rollup.
+//ms = load mono.mostack; // The plan is to Use stack for rollup when we get there.
 utils = load mono.utils;
-log = load mono.logging;
+
 
 {
 rssStr channel msg = "AR{\\\"channel\\\" : \\\"\(channel)\\\", \\\"message\\\" : \\\"\(msg)\\\"}",
 
 toLog logFilePath msg = 
-    log.logDebug "mono.toLog" "Writing to log file \(logFilePath).";
-    utils.spit logFilePath ( ( utils.slurp logFilePath ) ^ "\n\(msg)");
+    utils.logDebug "mono.emitters.toLog" "Writing to log file \(logFilePath).";
+    utils.spit logFilePath ( ( utils.slurp logFilePath ) ^ "\(msg)"),
 
+	
+
+	
 
 // todo: add implementation of rollup and throttle here.
  

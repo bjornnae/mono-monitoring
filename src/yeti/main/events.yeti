@@ -1,0 +1,60 @@
+module mono.events;
+/**
+	This module is responsible for identifying events. This is done by comparing the current index with 
+	a new message or by checking if the current index is too old and thus creates a time out event.
+
+*/
+
+typedef eventType = StateChange {current is string, next is string} | StateSame () | TTLHeartbeatMissed number | TTLHeartbeatOK number | DefaultStateLeave () | DefaultStateOff () | DefaultStateJoin () | DefaulStateStay () | NewIndex ();
+
+{
+    detectStateChange currentIndex newMessage =
+        // StateSame | StateChange oldstate newstate
+        if currentIndex.state != newMessage.state then StateChange {current = currentIndex.state, next = newMessage.state}
+        else StateSame ()
+        fi,
+    
+    detectStateDefault defaultState currentIndex newMessage = 
+        // DefaultStateStay | DefaultStateLeave | DefaultStateOff | DefaultStateJoin
+        if currentIndex.state != newMessage.state then
+            if currentIndex.state == defaultState then DefaultStateLeave ();
+		elif newMessage.state == defaultState then DefaultStateJoin ();
+		else DefaultStateOff ();
+            fi; 
+	    elif (currentIndex.state != defaultState and newMessage.state != defaultState) then DefaultStateOff ();
+	    else DefaulStateStay ();
+        fi,
+            
+    detectTTLHeartbeat defaultHeartbeat currentIndex newMessage =
+        // TTLHeartbeatOK | TTLHeartbeatMissed
+        var ttl = 0;
+        if (defined? currentIndex.ttl and currentIndex.ttl != 0) then ttl := currentIndex.ttl else ttl := defaultHeartbeat; fi;
+        if currentIndex.time + ttl < newMessage.time then TTLHeartbeatMissed (newMessage.time - currentIndex.time - ttl);
+        else TTLHeartbeatOK (newMessage.time - currentIndex.time - ttl); 
+        fi,
+        
+    getDefaultBase config =
+        defaultBaseLst = (filter do x: x.id == "_base" done) config;
+        if defined? defaultBaseLst then head defaultBaseLst else {id = "_base", defaultTTL = 10, defaultState = "ok"} fi,
+        
+    getIdxFromConfig config idx = (
+        collected = filter do x: x.id == idx done config;
+        case collected of
+            []: getDefaultBase config;   
+             _: head collected;
+        esac
+        ),
+    
+    evalEvents config currentIndex evMessage =
+        idx = evMessage.host ^ evMessage.service;
+        idxConfig = getIdxFromConfig config idx;
+        if idx in currentIndex then (
+            messageIndex = currentIndex[idx];	
+            {id = idx, t = evMessage.time, description = evMessage.description, ev = [
+                detectStateChange messageIndex evMessage,
+                detectStateDefault idxConfig.defaultState messageIndex evMessage,
+                detectTTLHeartbeat idxConfig.defaultTTL messageIndex evMessage]
+            });
+        else {id = idx, t = evMessage.time,  description = evMessage.description, ev = [NewIndex ()]}
+        fi,
+    }

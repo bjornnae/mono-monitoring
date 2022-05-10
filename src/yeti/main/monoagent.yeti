@@ -1,0 +1,147 @@
+module mono.monoagent;
+load yeti.lang.io;
+mp = load mono.parse;
+mproc = load mono.events;
+utils = load mono.utils;
+common = load mono.common;
+
+
+/*
+This is the monitoring solution.
+
+1. The logging solution (the companion eventlog for example) puts log messages into a central log which is a text file with one message per line.
+2. The monitoring solution periodically checks if new messages have arrived. 
+3. The state of the monitored world is kept in an index (in the file mono.db).
+3. All new messages on the central log before previous monitor run and this are detected.
+4. New messages are evaluated against the current state. If they lead to e.g. a state change an alert message will be sent.
+
+StateLogMessage
+stateLogObject
+events
+consumers
+emitters
+Index
+*/
+
+typedef configType = {
+	id is string, 
+	defaultTTL is number, 
+	defaultState is string
+	}
+	
+
+{
+	var storedIndexStruct = {var time = 0 is number, var indexedRowCount = 0 is number, var dbindex = [:] is hash<string, mp.stateLogObjType>},
+	
+	getCurrentTime _ = System#currentTimeMillis(),
+	
+	evLogAppend jsEvent = (
+		data = utils.slurp ((common.getProperties ( common.getPropertyfile () ))["mono.input.eventsfile"] ) ^ "\(jsEvent)";
+		utils.spit ((common.getProperties ( common.getPropertyfile () ))["mono.input.eventsfile"]) data
+	),
+	
+
+		
+	publishEv log event = push log event,
+	
+	// For each message in new events check if index is in baseline and if time is greater than baseline time.
+	detectNewMessages baselineIndex logevents is hash<string, mp.stateLogObjType> -> list?<mp.stateLogObjType> -> list?<mp.stateLogObjType> = (
+		utils.logDebug "mono.detectNewMessages" "Now start.";
+		newEvents = array [];
+		var rowCount = 0;
+		var newCount = 0;
+		for logevents do l:
+			rowCount := rowCount + 1;
+			idx = l.host ^ l.service;
+			if idx in baselineIndex then
+				if baselineIndex[idx].time < l.time then (
+					//print "+";
+					newCount := newCount + 1;
+					push newEvents l;) 
+				else 
+					//print "-";
+				fi;
+			else
+				newCount := newCount + 1;
+				push newEvents l;
+			fi;
+		done;
+		utils.logDebug "mono.detectNewMessages" "<DEBUG:detectNewMessages> rowCount: \(rowCount), newCount: \(newCount).";
+		newEvents),
+			
+	configurationExists? _ = (
+        f = listDirectory false './';
+        if contains? ( common.getPropertyfile () ) ( map (do d: d.name done) f ) then true
+        else false
+        fi),
+        
+    dbExists? _ = (
+        f = listDirectory false './';
+        dbfile = (common.getProperties ( common.getPropertyfile () ))["mono.db.indexfile"];
+        if contains? dbfile ( map (do d: d.name done) f ) then true
+        else false
+        fi
+        ),
+    
+    createBaselineDB _ = (
+        ll = map mp.jsStrTostateLogObject (mp.getLogLines ((common.getProperties ( common.getPropertyfile () ))["mono.input.eventsfile"]));
+        idx = utils.makeIndex ll;
+        utils.logDebug "mono.createBaselineDB" "\(idx)";
+        utils.persistIndex idx
+    ),
+    
+    matchConsumerActionsWithEvents consumers eventDict = 
+        for consumers (do c : 
+        if c.id == eventDict.id then 
+            for eventDict.ev (do event :
+            if (c.triggerOn event) then (c.actOn event) fi;
+            done);
+        fi;
+        done
+    ),
+    
+	// Missing heartbeat etc...
+	detectNonEvents currentIndex = (),
+		
+	
+    doEval config consumers currentIndex stateMessageList is list<configType> -> 'a -> hash<string, mp.stateLogObjType> -> list?<mp.stateLogObjType> -> () = 
+    //doEval config consumers currentIndex stateMessageList = 
+        case stateMessageList of 
+		[]: ();
+		_:  ( ev = mproc.evalEvents config currentIndex ( head stateMessageList ) ;
+			matchConsumerActionsWithEvents consumers ev; 
+			utils.logDebug "mono.doEval" "Events: \(ev)";
+            nextIndex = (utils.makeIndex ( head stateMessageList :: ( list currentIndex ) )).dbindex ;
+			doEval config consumers nextIndex ( tail stateMessageList ) ; // Watch tail recursion so that it doesn't eat up too much mem here!
+		     );
+        esac,
+        
+    checkPrerequisites _ =   
+        if (not configurationExists? ()) then throw new java.io.IOException("Configuration file \(( common.getPropertyfile () )) is missing. Useless to proceed without it.")
+        else
+            if not dbExists?() then (
+                utils.logDebug "mono.checkPrerequisites" "Database file does not exist. Creating a new one.";
+                createBaselineDB ();
+                )
+            else
+                utils.logDebug "mono.checkPrerequisites" "ALL prerequisites ok.";
+            fi;
+        fi,
+
+    monitorNewStateReportMessages config consumers = (
+        timeRunStart = getCurrentTime();
+        checkPrerequisites ();
+		currentStateIndex = utils.makeIndex (mp.parseLogLines(mp.getLogLines ((common.getProperties ( common.getPropertyfile () ))["mono.db.indexfile"]) ));
+		stateMessageList = mp.parseLogLines(mp.getLogLines ((common.getProperties ( common.getPropertyfile () ))["mono.input.eventsfile"]) );
+		newStateMessages = detectNewMessages currentStateIndex.dbindex stateMessageList;
+        doEval config consumers currentStateIndex.dbindex (list newStateMessages);
+		//indexFilePath = (common.getProperties ( common.getPropertyfile () )) ["mono.db.indexfile"];
+        utils.makeIndex stateMessageList |> utils.persistIndex ;
+		timeRunComplete = getCurrentTime();
+		utils.logDebug "mono.monitorNewStateReportMessages" "Elapsed time: \(timeRunComplete - timeRunStart)ms."
+    )
+        
+    
+}
+
+

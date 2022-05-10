@@ -28,7 +28,7 @@ test2 _ = (
 );
 
 test3 _ = (
-    pSafe = mp.jsLogTostateLogObject;
+    pSafe = mp.jsStrTostateLogObject;
     astr1 = '{"host":"VW00-T4120","service":"file transfer from vw00-t4105 to ftp","state":"ok","time":1.64541658E9,"description":"file transfered: _SKB_ResourceAssignmentSpread_data.enc","tags":null,"metric":null,"ttl":null}';
     astr2 = '{"host":"VW00-T4120","service":"file transfer from vw00-t4105 to ftp","state":"ok","time":1.64541658E9,"description":"file transfered: _SKB_ResourceAssignmentSpread_data.enc","tags":["some"],"metric": [{"name" : "aMetric", "value" : "some Value"}],"ttl":100}';
     astr3 = '{"host":"VW00-T4120","service":"file transfer from vw00-t4105 to ftp","state":"ok","time":1.64541658E9,"description":"file transfered: _SKB_ResourceAssignmentSpread_data.enc","tags":["some"],"metric": [{"name" : "metric1", "value" : "5"},{"name" : "metric2", "value" : "17"}],"ttl":100}';
@@ -38,5 +38,7 @@ test3 _ = (
 );
 
 runTests _ = (test1 (); test2 (); test3 ());
+
+runTests ();
 
 
