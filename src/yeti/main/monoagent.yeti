@@ -39,8 +39,6 @@ typedef configType = {
 		data = utils.slurp ((common.getProperties ( common.getPropertyfile () ))["mono.input.eventsfile"] ) ^ "\(jsEvent)";
 		utils.spit ((common.getProperties ( common.getPropertyfile () ))["mono.input.eventsfile"]) data
 	),
-	
-
 		
 	publishEv log event = push log event,
 	
@@ -55,25 +53,25 @@ typedef configType = {
 			idx = l.host ^ l.service;
 			if idx in baselineIndex then
 				if baselineIndex[idx].time < l.time then (
-					//print "+";
 					newCount := newCount + 1;
 					push newEvents l;) 
 				else 
-					//print "-";
 				fi;
 			else
 				newCount := newCount + 1;
 				push newEvents l;
 			fi;
 		done;
-		utils.logDebug "mono.detectNewMessages" "<DEBUG:detectNewMessages> rowCount: \(rowCount), newCount: \(newCount).";
-		newEvents),
+		utils.logInfo "monoagent.detectNewMessages" "rowCount: \(rowCount), newCount: \(newCount).";
+		newEvents
+	),
 			
 	configurationExists? _ = (
         f = listDirectory false './';
         if contains? ( common.getPropertyfile () ) ( map (do d: d.name done) f ) then true
         else false
-        fi),
+        fi
+	),
         
     dbExists? _ = (
         f = listDirectory false './';
@@ -81,7 +79,7 @@ typedef configType = {
         if contains? dbfile ( map (do d: d.name done) f ) then true
         else false
         fi
-        ),
+	),
     
     createBaselineDB _ = (
         ll = map mp.jsStrTostateLogObject (mp.getLogLines ((common.getProperties ( common.getPropertyfile () ))["mono.input.eventsfile"]));
@@ -94,25 +92,21 @@ typedef configType = {
         for consumers (do c : 
         if c.id == eventDict.id then 
             for eventDict.ev (do event :
-            if (c.triggerOn event) then (c.actOn event) fi;
+				if (c.triggerOn event) then (c.actOn event) fi;
             done);
         fi;
         done
     ),
-    
-	// Missing heartbeat etc...
-	detectNonEvents currentIndex = (),
-		
 	
     doEval config consumers currentIndex stateMessageList is list<configType> -> 'a -> hash<string, mp.stateLogObjType> -> list?<mp.stateLogObjType> -> () = 
-    //doEval config consumers currentIndex stateMessageList = 
         case stateMessageList of 
 		[]: ();
 		_:  ( ev = mproc.evalEvents config currentIndex ( head stateMessageList ) ;
-			matchConsumerActionsWithEvents consumers ev; 
-			utils.logDebug "mono.doEval" "Events: \(ev)";
-            nextIndex = (utils.makeIndex ( head stateMessageList :: ( list currentIndex ) )).dbindex ;
-			doEval config consumers nextIndex ( tail stateMessageList ) ; // Watch tail recursion so that it doesn't eat up too much mem here!
+			  utils.logDebug "mono.doEval" "stateMessage: \(head stateMessageList)";
+			  matchConsumerActionsWithEvents consumers ev; 
+			  utils.logDebug "mono.doEval" "Events: \(ev)";
+              nextIndex = (utils.makeIndex ( head stateMessageList :: ( list currentIndex ) )).dbindex ;
+			  doEval config consumers nextIndex ( tail stateMessageList ) ; // Watch this tail recursion so that it doesn't eat up too much mem here!
 		     );
         esac,
         
@@ -135,13 +129,8 @@ typedef configType = {
 		stateMessageList = mp.parseLogLines(mp.getLogLines ((common.getProperties ( common.getPropertyfile () ))["mono.input.eventsfile"]) );
 		newStateMessages = detectNewMessages currentStateIndex.dbindex stateMessageList;
         doEval config consumers currentStateIndex.dbindex (list newStateMessages);
-		//indexFilePath = (common.getProperties ( common.getPropertyfile () )) ["mono.db.indexfile"];
         utils.makeIndex stateMessageList |> utils.persistIndex ;
 		timeRunComplete = getCurrentTime();
-		utils.logDebug "mono.monitorNewStateReportMessages" "Elapsed time: \(timeRunComplete - timeRunStart)ms."
+		utils.logInfo "monoagent.monitorNewStateReportMessages" "Elapsed time: \(timeRunComplete - timeRunStart)ms."
     )
-        
-    
 }
-
-

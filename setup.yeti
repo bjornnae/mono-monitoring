@@ -4,7 +4,7 @@ utils = load mono.utils;
 mp = load mono.parse;
 em = load mono.emitters;
 me = load mono.events;
-mr = load mono.run;
+run = load mono.run;
 common = load mono.common;
 
 /* This is the mono agent configuration point and the program entry point. 
@@ -13,10 +13,21 @@ common = load mono.common;
  *  
  * Here we define two things: config and consumers.
  */
+ 
+ /** 
+
+This is also the class that is used for launching 
+the application when it is packaged into a jar file. 
+the manifest file which is added to the jar archive in order to make it complete need to point to this class with the line:
+
+    Main-Class: mono.JarRunner
+
+*/
 
 	// If no other config is found, the config for _base will be used.
-	
-    config  = [
+
+
+    serviceConfig = [
         {id = "_base", defaultTTL = 10, defaultState = "ok"}, 
         {id = "bndlaptoptestService", defaultTTL = 10, defaultState = "ok"},
 		{id = "bndlaptoptestService.beat", defaultTTL = 10, defaultState = "ok"}
@@ -36,7 +47,7 @@ common = load mono.common;
 						//Otherwise we will generate a lot of messages and reset the ttl repeatedly.
 						if not ((id ^ ".beat") in currentStateIndex.dbindex) or (currentStateIndex.dbindex[id ^ ".beat"].state == "stale") then ( 
 							mo.evLogAppend (mp.stateLogObjectToJSON (mp.makeEv (mo.getCurrentTime () / 1000) "bndlaptop" "testService.beat" 
-								"fail" "Search party for missing heartbeat." [] [""] (me.getIdxFromConfig config "bndlaptoptestService").defaultTTL ));
+								"fail" "Search party for missing heartbeat." [] [""] (me.getIdxFromConfig serviceConfig "bndlaptoptestService").defaultTTL ));
 							utils.logDebug "mono.setup.consumers" "<ACTION:\(name)> Missing heart. Activate search party until found again.";
 						) fi;
 					)
@@ -54,7 +65,9 @@ common = load mono.common;
 			// This consumer produces a message every time the log message goes from a deviating state back to the desireable state.
             {name = "detect-stay-in-state-2", id = "bndlaptoptestService", 
                 triggerOn = do ev: case  ev of DefaultStateJoin n: true; _: false; esac; done, 
-                actOn = do evRec: utils.logDebug "mono.setup.consumers" "<ACTION:\(name)> Returning to OK State."; done;  
+                actOn = do evRec: em.toLog ((common.getProperties  (common.getPropertyfile ()))["mono.output.rssFile"] )  
+											(em.rssStr "testServiceReporting" "Info: Return to default state.");
+						done;  
 			},
             
 			// Heartbeat: finding it.	
@@ -71,20 +84,19 @@ common = load mono.common;
 						done;
 				},
 
-			// Heattbeat: not finding it: generate a message once and resetting.
+			// Heartbeat: not finding it: generate a message once and resetting.
             {name = "detect-missing-heartbeat-2", id = "bndlaptoptestService.beat", 
                 triggerOn = do ev : case  ev of TTLHeartbeatMissed n: true; _: false; esac; done, 
                 actOn = do evRec: 
 								mo.evLogAppend (mp.stateLogObjectToJSON (mp.makeEv (mo.getCurrentTime () / 1000) "bndlaptop" "testService.beat" 
-									"stale" "Search party found beat." [] [""] 0 )); 
+									"stale" "Search party is missing beat." [] [""] 0 )); 
 								em.toLog ((common.getProperties  (common.getPropertyfile ()))["mono.output.rssFile"] ) 
-									( em.rssStr "testServiceReporting" "Warning: Skipped a heartbeat.");
+									( em.rssStr "testServiceReporting" "Warning: Missing heartbeat.");
 						done;
 				},
-				
         ];
-
+	
 // Start the monitoring agent.				
-mr.run config consumers;
-
-  
+run.runArgs serviceConfig consumers;
+				
+				

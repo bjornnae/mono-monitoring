@@ -1,0 +1,22 @@
+module mono.logrotate;
+
+/**
+Log rotation
+
+This module is involved with the rotation of logs. 
+File IO represents the biggest resource usage by the monitoring agent and thus the size of especially the 
+input log (mono.input.eventsfile written from the log service) affects performance in a linear resource use fashion.
+
+The log rotate checks the number of lines in the input log and every time they exceed a configurable count 
+(mono.input.eventsfile.rotate_at_linecount) the rotateFile function will be called. 
+
+This will result in:
+ 1. The selected file will be copied to a backup file. 
+ 2. The backup file will be named as the original file with a sequence number added.
+ 3. The original file will be emptied.
+
+*/
+{
+rotateFile(filePath) is string -> () = ();
+
+}

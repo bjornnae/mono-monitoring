@@ -1,1 +1,2 @@
-Main-Class: mono.run
+Class-Path: ./lib/yeti.jar
+Main-Class: mono.setup

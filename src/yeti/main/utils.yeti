@@ -13,6 +13,10 @@ typedef indexType = {
     slurp fileName = readFile fileName  '' getContents,
     
     spit fileName content = writeFile fileName '' (`putLines` [content]),
+	
+	// TODO: Implement async write to file. 
+	// Now files get garbled sometimes when several processes write at the same time.
+	spitAsync fileName content = (),
     
     getCurrentTime _ = System#currentTimeMillis(),
 
@@ -21,8 +25,7 @@ typedef indexType = {
     indexToJSFile _ = (  
 	dLines = slurp (common.getProperties  (common.getPropertyfile ()))['mono.db.indexfile']; 
 	spit ((common.getProperties  (common.getPropertyfile ()))['mono.output.jsIndex']) 
-            "var monoindex = [\(strReplace ',\n' '\n' dLines) ];")
-    ,
+            "var monoindex = [\(strReplace ',\n' '\n' dLines) ];"),
 		
     // Make index of logLst containing Event objects.
     makeIndex logLst is list<'a> -> indexType = (
@@ -33,7 +36,7 @@ typedef indexType = {
 			indexKey = r.host ^ r.service;
 			if indexKey in dbindex then (	
 				if (dbindex[indexKey].time > r.time) then 
-                                    logWarn "utils.makeIndex" "WARNING: Message is out of time. Discarding this older message for indexing: \(r)";
+                                    logDebug "utils.makeIndex" "Message is out of sequence. Time diff: \((dbindex[indexKey].time - r.time) / 1000) seconds. Ignoring this older message while indexing: \(r)";
 				else dbindex[indexKey] := r
 				fi );
 			else dbindex[indexKey] := r;
@@ -44,30 +47,30 @@ typedef indexType = {
 		
     // Save Index state to disk.	
     persistIndex dbIndexStruct = (
-	dbEncoding = ''; 
-	indexLines = list dbIndexStruct.dbindex;
-        dbIndexFilePath = ((common.getProperties (common.getPropertyfile ()))['mono.db.indexfile']);  
-	writeFile dbIndexFilePath dbEncoding 
+		dbEncoding = ''; 
+		indexLines = list dbIndexStruct.dbindex;
+			dbIndexFilePath = ((common.getProperties (common.getPropertyfile ()))['mono.db.indexfile']);  
+		writeFile dbIndexFilePath dbEncoding 
           (`putLines` 
               (map string 
                   (map parse.stateLogObjectToJSON indexLines))
           );
-	// Finally, also write an index that can be used by an external javascript monitoring UI:
-	indexToJSFile ();
+		// Finally, also write an index that can be used by an external javascript monitoring UI:
+		indexToJSFile ();
     ),		
 		
     // TODO: Need to think through design, will need some kind of log file action that can be parsed and reacted upon. 
     //Untested. 
-    /*removeFromIndex removeId logLst = 
+    /*
+	removeFromIndex removeId logLst = 
 		idx = makeIndex logLst;
 		ks = keys idx;
 		remainders = filter (_ k = k != removeId) ks;
 		common.persistIndex (map (_ id = idx[id]) remainders),
-*/
+	*/
     // TODO: move to own module perhaps mono.testing
     testAssert testname testTrueFalse blockIfTrue blockIfFalse = 
         if testTrueFalse then (blockIfTrue ()) else (blockIfTrue ()) fi,
-    
 
     //// Logging. Moved here due to circular dependencies with utils.
     var logLevel = 0,
